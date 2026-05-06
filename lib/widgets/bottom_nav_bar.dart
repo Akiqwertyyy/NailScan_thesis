@@ -1,105 +1,69 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 
-/// Reusable bottom navigation bar widget
 class BottomNavBar extends StatelessWidget {
-  final String currentScreen;
-  final Function(String) onNavigate;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
 
   const BottomNavBar({
     super.key,
-    required this.currentScreen,
-    required this.onNavigate,
+    required this.currentIndex,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        border: const Border(
-          top: BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          height: 92,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.92),
+            border: const Border(top: BorderSide(color: AppColors.border)),
+            boxShadow: const [
+              BoxShadow(color: AppColors.shadow, blurRadius: 20, offset: Offset(0, -6)),
+            ],
           ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            _buildNavButton(
-              icon: Icons.home,
-              label: 'Diagnose',
-              isActive: currentScreen == 'home',
-              onTap: () => onNavigate('home'),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildItem(Icons.home_rounded, 'Home', 0),
+                _buildItem(Icons.history_rounded, 'History', 1),
+                _buildItem(Icons.info_outline_rounded, 'About', 2),
+              ],
             ),
-            const SizedBox(width: 12),
-            _buildNavButton(
-              icon: Icons.history,
-              label: 'History',
-              isActive: currentScreen == 'history',
-              onTap: () => onNavigate('history'),
-            ),
-            const SizedBox(width: 12),
-            _buildNavButton(
-              icon: Icons.info,
-              label: 'About',
-              isActive: currentScreen == 'about',
-              onTap: () => onNavigate('about'),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            gradient: isActive
-                ? const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-                  )
-                : null,
-            color: isActive ? null : Colors.white,
-            border: isActive
-                ? null
-                : Border.all(color: const Color(0xFFE5E7EB), width: 2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : const Color(0xFF6B7280),
-                size: 20,
+  Widget _buildItem(IconData icon, String label, int index) {
+    final active = currentIndex == index;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 94,
+        height: 72,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 32, color: active ? AppColors.primary : AppColors.textMuted),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                color: active ? AppColors.primary : AppColors.textMuted,
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isActive ? Colors.white : const Color(0xFF6B7280),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

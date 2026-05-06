@@ -1,24 +1,23 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../models/diagnosis_result.dart';
 
-/// Full-screen bottom sheet showing diagnosis details.
-/// When [onSaveToHistory] is provided (fresh result), shows "Discard" + "Save to History" buttons.
-/// When null (opened from history), shows the original "Scan Again" button.
+import 'package:flutter/services.dart';
+
 class DiagnosisDetailSheet extends StatelessWidget {
   final DiagnosisResult result;
   final String date;
   final String? imagePath;
   final VoidCallback onScanAgain;
-  final VoidCallback? onSaveToHistory;
-
+  final Future<void> Function()? onDelete;
   const DiagnosisDetailSheet({
     super.key,
     required this.result,
     required this.date,
     required this.onScanAgain,
-    this.onSaveToHistory,
     this.imagePath,
+    this.onDelete,
   });
 
   static Future<void> show(
@@ -26,609 +25,145 @@ class DiagnosisDetailSheet extends StatelessWidget {
     required DiagnosisResult result,
     required String date,
     required VoidCallback onScanAgain,
-    VoidCallback? onSaveToHistory,
     String? imagePath,
+    Future<void> Function()? onDelete,
   }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
-      isDismissible: onSaveToHistory == null, // can't swipe-dismiss fresh result
-      enableDrag: onSaveToHistory == null,
       builder: (_) => DiagnosisDetailSheet(
         result: result,
         date: date,
         imagePath: imagePath,
         onScanAgain: onScanAgain,
-        onSaveToHistory: onSaveToHistory,
+        onDelete: onDelete,
       ),
     );
   }
+
+  bool get _healthy => result.condition.toLowerCase().contains('healthy');
+  Color get _accent => _healthy ? AppColors.success : AppColors.warning;
+  String get _riskLabel => result.riskLevel == RiskLevel.low ? 'Low' : result.riskLevel == RiskLevel.moderate ? 'Moderate' : 'High';
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.93,
-      minChildSize: 0.5,
-      maxChildSize: 0.97,
-      builder: (_, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              // Drag handle
-              Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD1D5DB),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              // Header
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  border: const Border(
-                    bottom: BorderSide(color: Color(0xFFDDEAFE)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    // Only show close button when opened from history
-                    if (onSaveToHistory == null)
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child:
-                            const Icon(Icons.close, color: Color(0xFF6B7280)),
-                      )
-                    else
-                      const SizedBox(width: 24),
-                    const Expanded(
-                      child: Text(
-                        'Diagnosis Result',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                  ],
-                ),
-              ),
-
-              // Scrollable content
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      // Thumbnail
-                      if (imagePath != null) ...[
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _buildImage(imagePath!),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      _buildMainResultCard(context),
-                      const SizedBox(height: 20),
-                      _buildConditionDescription(),
-                      const SizedBox(height: 12),
-                      _buildListSection(
-                        title: 'Underlying Causes',
-                        items: result.underlyingCauses,
-                        bulletColor: const Color(0xFF2563EB),
-                        borderColor: const Color(0xFFDDEAFE),
-                        backgroundColor: Colors.white,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildListSection(
-                        title: 'Common Symptoms',
-                        items: result.symptoms,
-                        bulletColor: const Color(0xFF9333EA),
-                        borderColor: const Color(0xFFF3E8FF),
-                        backgroundColor: const Color(0xFFFAF5FF),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTreatment(),
-                      const SizedBox(height: 12),
-                      _buildRiskLevel(),
-                      const SizedBox(height: 12),
-                      _buildRecommendation(),
-                      const SizedBox(height: 80),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Bottom action buttons
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  border: const Border(
-                    top: BorderSide(color: Color(0xFFDDEAFE)),
-                  ),
-                ),
-                child: onSaveToHistory != null
-                    // ── Fresh result: Discard + Save to History ──
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                onScanAgain();
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                side: const BorderSide(
-                                    color: Color(0xFFE5E7EB)),
+    return SizedBox(
+      height: MediaQuery.of(context).size.height,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.white, AppColors.background, AppColors.backgroundSoft])),
+          child: SafeArea(
+            child: Column(children: [
+              Padding(padding: const EdgeInsets.fromLTRB(8, 8, 8, 8), child: Row(children: [IconButton(onPressed:()=>Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color:AppColors.textDark)), const Expanded(child: Text('Scan Details', textAlign: TextAlign.center, style: TextStyle(fontSize:16, fontWeight:FontWeight.w900, color:AppColors.textDark))), IconButton(
+                    onPressed: onDelete == null
+                        ? null
+                        : () async {
+                            final shouldDelete = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                backgroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
-                              ),
-                              child: const Text(
-                                'Discard',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF6B7280),
+                                title: const Text(
+                                  'Delete Scan?',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.textDark,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                onSaveToHistory!();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                content: const Text(
+                                  'This scan result will be removed from your history.',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
-                                elevation: 4,
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              child: const Text(
-                                'Save to History',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    // ── Opened from history: Scan Again ──
-                    : SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            onScanAgain();
+                            );
+
+                            if (shouldDelete == true) {
+                              await onDelete?.call();
+
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+                            }
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 4,
-                          ),
-                          child: const Text(
-                            'Scan Again',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildImage(String path) {
-    final file = File(path);
-    if (file.existsSync()) {
-      return Image.file(file,
-          height: 160, width: double.infinity, fit: BoxFit.cover);
-    }
-    return Image.asset(
-      path,
-      height: 160,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        height: 160,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.image_not_supported,
-            color: Color(0xFF9CA3AF), size: 48),
-      ),
-    );
-  }
-
-  Widget _buildMainResultCard(BuildContext context) {
-    final colors = result.getCardColors();
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors['cardGradient'] as List<Color>,
-        ),
-        border: Border.all(color: colors['borderColor'] as Color),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Detected Condition',
-            style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            result.condition,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: colors['badgeGradient'] as List<Color>,
-              ),
-              border:
-                  Border.all(color: colors['badgeBorderColor'] as Color),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'Confidence Score',
-                  style:
-                      TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${result.confidence}%',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: colors['badgeTextColor'] as Color,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Analysis Details',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF374151),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _buildAnalysisCard('Shape', result.shape, Icons.crop_square),
-          const SizedBox(height: 8),
-          _buildAnalysisCard('Color', result.color, Icons.palette),
-          const SizedBox(height: 8),
-          _buildAnalysisCard('Texture', result.texture, Icons.texture),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAnalysisCard(String title, String content, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFDDEAFE)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: const Color(0xFF2563EB), size: 15),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF6B7280))),
-                const SizedBox(height: 3),
-                Text(content,
-                    style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF111827))),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConditionDescription() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFDDEAFE)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Condition Description',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827))),
-          const SizedBox(height: 10),
-          Text(result.description,
-              style: const TextStyle(
-                  fontSize: 13, color: Color(0xFF374151), height: 1.5)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListSection({
-    required String title,
-    required List<String> items,
-    required Color bulletColor,
-    required Color borderColor,
-    required Color backgroundColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827))),
-          const SizedBox(height: 12),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('• ',
-                        style: TextStyle(
-                            color: bulletColor, fontSize: 13, height: 1.5)),
-                    Expanded(
-                      child: Text(item,
-                          style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF374151),
-                              height: 1.5)),
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
                     ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTreatment() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF0FDF4), Colors.white],
+                  )])),
+              Expanded(child: SingleChildScrollView(physics: const BouncingScrollPhysics(), padding: const EdgeInsets.fromLTRB(20, 8, 20, 20), child: Column(children: [
+                _summaryCard(), const SizedBox(height:12), _analysisCard(), const SizedBox(height:12), _infoCard(), const SizedBox(height:12), _recommendations(),
+              ]))),
+Padding(
+  padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+  child: Row(
+    children: [
+      Expanded(
+        child: _bottomButton(
+          'Scan Again',
+          true,
+          () => Navigator.pop(context),
         ),
-        border: Border.all(color: const Color(0xFFBBF7D0)),
-        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Treatment Options',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827))),
-          const SizedBox(height: 12),
-          ...result.treatment.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('• ',
-                        style: TextStyle(
-                            color: Color(0xFF16A34A),
-                            fontSize: 13,
-                            height: 1.5)),
-                    Expanded(
-                      child: Text(item,
-                          style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF374151),
-                              height: 1.5)),
-                    ),
-                  ],
-                ),
-              )),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD1FAE5),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'Note: Treatment should be prescribed by a healthcare professional.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF065F46)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRiskLevel() {
-    final riskColors = result.getRiskLevelColors();
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: riskColors['background'],
-        border: Border.all(color: riskColors['border']!, width: 2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Risk Level',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF111827))),
-              Text(
-                result.riskLevel.toString().split('.').last.toUpperCase(),
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: riskColors['text']),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: result.riskLevel == RiskLevel.low
-                  ? 0.33
-                  : result.riskLevel == RiskLevel.moderate
-                      ? 0.66
-                      : 1.0,
-              minHeight: 10,
-              backgroundColor: Colors.white,
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(riskColors['color']!),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecommendation() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFEFF6FF), Color(0xFFBFDBFE)],
+      const SizedBox(width: 10),
+      Expanded(
+        child: _bottomButton(
+          'Exit',
+          false,
+          () => SystemNavigator.pop(),
         ),
-        border: Border.all(
-            color: const Color(0xFF2563EB).withOpacity(0.3), width: 2),
-        borderRadius: BorderRadius.circular(16),
       ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info, color: Color(0xFF2563EB), size: 18),
-          SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Recommendation',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2563EB))),
-                SizedBox(height: 6),
-                Text(
-                  'This result is AI-generated and intended for preliminary screening only. '
-                  'Please consult a licensed healthcare professional for confirmation and treatment.',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF374151),
-                      height: 1.5),
-                ),
-              ],
-            ),
+    ],
+  ),
+),       
+     ]),
           ),
-        ],
+        ),
       ),
     );
   }
+  Widget _summaryCard()=>Container(padding: const EdgeInsets.all(12), decoration: _dec(), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    ClipRRect(borderRadius: BorderRadius.circular(12), child: Container(width:86,height:106,color:AppColors.surfaceSoft, child: imagePath!=null?Image.file(File(imagePath!), fit:BoxFit.cover, errorBuilder:(_,__,___)=>Icon(Icons.fingerprint_rounded,color:_accent,size:42)):Icon(Icons.fingerprint_rounded,color:_accent,size:42))),
+    const SizedBox(width:14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Expanded(child: Text(result.condition.replaceAll(' Nail',''), maxLines:1, overflow:TextOverflow.ellipsis, style: const TextStyle(fontSize:20, fontWeight:FontWeight.w900, color:AppColors.textDark))), Icon(_healthy?Icons.check_circle_rounded:Icons.warning_rounded, color:_accent, size:20)]), const SizedBox(height:4), Text(date, style: const TextStyle(fontSize:11, fontWeight:FontWeight.w600, color:AppColors.textSecondary)), const SizedBox(height:14), const Text('Confidence Score', style: TextStyle(fontSize:12, fontWeight:FontWeight.w800, color:AppColors.textSecondary)), Text('${result.confidence.toStringAsFixed(0)}%', style: const TextStyle(fontSize:22, fontWeight:FontWeight.w900, color:AppColors.primary)), ClipRRect(borderRadius: BorderRadius.circular(999), child: LinearProgressIndicator(value: result.confidence/100, minHeight:6, backgroundColor:AppColors.border, valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary)))])),
+  ]));
+  Widget _analysisCard()=>_section('Analysis Details', Column(children: [_row('Shape', result.shape), _row('Color', result.color), _row('Texture', result.texture)]));
+Widget _infoCard()=>_section('Additional Information', Column(children: [
+  _kv('Risk Level', _riskLabel),
+]));  Widget _recommendations()=>_section('Recommendations', Column(children: const [_Bullet('Maintain regular nail hygiene'), _Bullet('Avoid prolonged moisture exposure'), _Bullet('Use protective gloves when handling chemicals')]));
+  Widget _section(String title, Widget child)=>Container(width:double.infinity, padding: const EdgeInsets.all(16), decoration: _dec(), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize:15, fontWeight:FontWeight.w900, color:AppColors.primary)), const SizedBox(height:12), child]));
+  Widget _row(String l, String v)=>Padding(padding: const EdgeInsets.only(bottom:10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: const TextStyle(fontSize:12, fontWeight:FontWeight.w900, color:AppColors.textSecondary)), const SizedBox(height:3), Text(v, style: const TextStyle(fontSize:13, fontWeight:FontWeight.w600, color:AppColors.descriptionDark)), const Divider(color:AppColors.border)]));
+  Widget _kv(String l, String v)=>Padding(padding: const EdgeInsets.only(bottom:8), child: Row(children: [Text(l, style: const TextStyle(fontSize:12, fontWeight:FontWeight.w900, color:AppColors.textSecondary)), const Spacer(), Text(v, style: const TextStyle(fontSize:12, fontWeight:FontWeight.w800, color:AppColors.textSecondary))]));
+  Widget _bottomButton(String text, bool filled, VoidCallback tap)=>GestureDetector(onTap:tap, child: Container(height:50, alignment:Alignment.center, decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), color: filled?null:Colors.white, gradient: filled?const LinearGradient(colors:[AppColors.primary, AppColors.primaryDark]):null, border: filled?null:Border.all(color:AppColors.border)), child: Text(text, style: TextStyle(color:filled?Colors.white:AppColors.primary, fontWeight:FontWeight.w900))));
+  BoxDecoration _dec()=>BoxDecoration(color:Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color:AppColors.border), boxShadow: const [BoxShadow(color:AppColors.shadow, blurRadius:14, offset:Offset(0,5))]);
 }
+class _Bullet extends StatelessWidget{final String text; const _Bullet(this.text); @override Widget build(BuildContext context)=>Padding(padding: const EdgeInsets.only(bottom:10), child: Row(children: [const Icon(Icons.health_and_safety_outlined, size:17, color:AppColors.primary), const SizedBox(width:10), Expanded(child: Text(text, style: const TextStyle(fontSize:13, fontWeight:FontWeight.w700, color:AppColors.textSecondary)))]));}

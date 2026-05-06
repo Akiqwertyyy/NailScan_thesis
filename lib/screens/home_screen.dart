@@ -1,59 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../widgets/bottom_nav_bar.dart';
 
-// ── Warm Skin-Tone Palette ────────────────────────────────────────────────────
-class AppColors {
-  static const Color primary    = Color(0xFFC97A5A);
-  static const Color mid        = Color(0xFFD9956E);
-  static const Color blush      = Color(0xFFD4A09A);
-  static const Color light      = Color(0xFFECC9B8);
-  static const Color cream      = Color(0xFFF9EDE6);
-
-  static const Color healthy    = Color(0xFF8BAF7A);
-  static const Color warning    = Color(0xFFD9956E);
-  static const Color unident    = Color(0xFFB8A09A);
-
-  static const Color textDark   = Color(0xFF4A2416);
-  static const Color textMid    = Color(0xFF7A4030);
-  static const Color textMuted  = Color(0xFFAA7060);
-
-  static const Color cardBg     = Color(0xFFFFFAF8);
-  static const Color cardBorder = Color(0xFFF0D0C0);
-  static const Color navBg      = Color(0xFFFFFAF8);
-
-  static const LinearGradient gradientBg = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [
-      Color(0xFFF5DDD0),
-      Color(0xFFF9EDE6),
-      Color(0xFFF2D8C8),
-      Color(0xFFEDCFBE),
-    ],
-    stops: [0.0, 0.3, 0.7, 1.0],
-  );
-
-  static const LinearGradient gradientLogo = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFD9956E), Color(0xFFC97A5A)],
-  );
-
-  static const LinearGradient gradientButton = LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: [Color(0xFFD9956E), Color(0xFFC97A5A)],
-  );
-
-  // FIXED: RadialGradient declared as RadialGradient (not LinearGradient)
-  static const RadialGradient gradientOverlay = RadialGradient(
-    colors: [Color(0xFFECC9B8), Color(0xFFD4A09A)],
-  );
-}
-
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   final VoidCallback? onStartDiagnosis;
-  final Function(String)? onNavigate;
+  final void Function(String)? onNavigate;
   final String? currentScreen;
 
   const HomeScreen({
@@ -64,308 +16,181 @@ class HomeScreen extends StatefulWidget {
   });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  int _selectedIndex = 0;
-
-  late AnimationController _fadeController;
-  late AnimationController _slideController;
-  late AnimationController _glowController;
-
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _glowAnimation;
-
-  static const List<String> _screenKeys = ['home', 'history', 'about'];
-
-  @override
-  void initState() {
-    super.initState();
-
-    if (widget.currentScreen != null) {
-      final idx = _screenKeys.indexOf(widget.currentScreen!);
-      if (idx != -1) _selectedIndex = idx;
-    }
-
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 900),
-      vsync: this,
-    );
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _glowController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOut,
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-    _glowAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
-    );
-
-    _fadeController.forward();
-    _slideController.forward();
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
-    _glowController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final padding = MediaQuery.of(context).padding;
-
-    return Scaffold(
-      backgroundColor: AppColors.cream,
-      body: Stack(
-        children: [
-          _buildBackground(size),
-          _buildBlurredNailOverlay(size),
-          _buildBokehDots(size),
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: _buildMainContent(size, padding),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFEAF2FF),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 0,
+          onTap: (index) {
+            if (index == 0) onNavigate?.call('home');
+            if (index == 1) onNavigate?.call('history');
+            if (index == 2) onNavigate?.call('about');
+          },
+        ),
+        body: Stack(
+          children: [
+            const _PremiumHomeBackground(),
+            const _SoftCircle(top: -60, right: -60, size: 190, opacity: .33),
+            const _SoftCircle(top: 170, left: -75, size: 180, opacity: .20),
+            const _SoftCircle(bottom: 80, right: -45, size: 150, opacity: .20),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(painter: _BokehPainter()),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildBottomNav(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackground(Size size) {
-    return Container(
-      width: size.width,
-      height: size.height,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFF5DDD0),
-            Color(0xFFF9EDE6),
-            Color(0xFFF2D8C8),
-            Color(0xFFEDCFBE),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 42),
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    const Spacer(),
+                    _buildFeatureSection(),
+                    const Spacer(),
+                    _buildStartButton(),
+                  ],
+                ),
+              ),
+            ),
           ],
-          stops: [0.0, 0.3, 0.7, 1.0],
         ),
       ),
     );
   }
 
-  Widget _buildBlurredNailOverlay(Size size) {
-    return Positioned(
-      top: -40,
-      right: -60,
-      child: Opacity(
-        opacity: 0.18,
-        child: Container(
-          width: size.width * 0.75,
-          height: size.height * 0.45,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(40),
-            gradient: const RadialGradient(
-              colors: [Color(0xFFECC9B8), Color(0xFFD4A09A)],
-            ),
+  Widget _buildHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'NailScan',
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0A2A66),
+                  letterSpacing: -0.7,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'AI Nail Health Analysis',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF46639A),
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Scan your fingernail for fast AI-powered nail health screening.',
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF5F79A6),
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildBokehDots(Size size) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: CustomPaint(
-          painter: BokehPainter(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMainContent(Size size, EdgeInsets padding) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: constraints.maxHeight - 90,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 28, 20, 110),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  _buildLogo(),
-                  const SizedBox(height: 20),
-                  _buildTitle(),
-                  const SizedBox(height: 8),
-                  _buildSubtitleBadge(),
-                  const SizedBox(height: 22),
-                  _buildDescription(),
-                  const SizedBox(height: 32),
-                  AnimatedBuilder(
-                    animation: _glowAnimation,
-                    builder: (context, child) => _buildStartButton(),
-                  ),
-                  const SizedBox(height: 28),
-                  _buildFeatureCard(
-                    icon: Icons.bar_chart_rounded,
-                    title: 'Instant AI-powered analysis',
-                    subtitle: 'AI-powered analysis today.',
-                    iconColor: AppColors.primary,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildFeatureCard(
-                    icon: Icons.history_rounded,
-                    title: 'Track your nail health history',
-                    subtitle: 'Review past scan results.',
-                    iconColor: AppColors.primary,
+        const SizedBox(width: 14),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              width: 62,
+              height: 62,
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.44),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(.75)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0B5CFF).withOpacity(.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 7),
                   ),
                 ],
               ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLogo() {
-    return Container(
-      width: 90,
-      height: 90,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFD9956E), Color(0xFFC97A5A)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
-            blurRadius: 24,
-            spreadRadius: 2,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 14,
-            right: 14,
-            child: Container(
-              width: 5,
-              height: 5,
-              decoration: const BoxDecoration(
-                color: Colors.white54,
-                shape: BoxShape.circle,
+              child: Image.asset(
+                'assets/images/logo.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.fingerprint_rounded,
+                  color: Color(0xFF0B5CFF),
+                  size: 34,
+                ),
               ),
             ),
           ),
-          Positioned(
-            bottom: 18,
-            left: 12,
-            child: Container(
-              width: 3,
-              height: 3,
-              decoration: const BoxDecoration(
-                color: Colors.white38,
-                shape: BoxShape.circle,
-              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureSection() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(.34),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: Colors.white.withOpacity(.72),
+              width: 1.6,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0B5CFF).withOpacity(.12),
+                blurRadius: 34,
+                offset: const Offset(0, 18),
+              ),
+              BoxShadow(
+                color: Colors.white.withOpacity(.26),
+                blurRadius: 16,
+                offset: const Offset(-6, -6),
+              ),
+            ],
           ),
-          const Icon(
-            Icons.fingerprint,
-            size: 52,
-            color: Colors.white,
+          child: const Column(
+            children: [
+              FeatureCard(
+                icon: Icons.flash_on_rounded,
+                title: 'Instant Analysis',
+                subtitle: 'Get results in seconds.',
+                showDivider: true,
+              ),
+              FeatureCard(
+                icon: Icons.history_rounded,
+                title: 'Scan History',
+                subtitle: 'View your previous scans.',
+                showDivider: true,
+              ),
+              FeatureCard(
+                icon: Icons.lock_rounded,
+                title: 'Private & Secure',
+                subtitle: 'Your data is stored only on your device.',
+                showDivider: false,
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTitle() {
-    return const Text(
-      'NailScan',
-      style: TextStyle(
-        fontSize: 34,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textDark,
-        letterSpacing: -0.5,
-        height: 1.1,
-      ),
-    );
-  }
-
-  Widget _buildSubtitleBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.20),
-          width: 1,
-        ),
-      ),
-      child: const Text(
-        'AI-Powered Nail Health Analysis',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textMid,
-          letterSpacing: 0.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDescription() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12),
-      child: Text(
-        'Scan your fingernail to detect possible\nconditions using advanced AI technology.',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textMid,
-          height: 1.6,
-          letterSpacing: 0.1,
         ),
       ),
     );
@@ -373,241 +198,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildStartButton() {
     return GestureDetector(
-      onTap: () => widget.onStartDiagnosis?.call(),
-      child: AnimatedBuilder(
-        animation: _glowAnimation,
-        builder: (context, child) {
-          return Container(
-            width: double.infinity,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              gradient: const LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [Color(0xFFD9956E), Color(0xFFC97A5A)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary
-                      .withOpacity(0.35 * _glowAnimation.value),
-                  blurRadius: 20 * _glowAnimation.value,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: AppColors.light
-                      .withOpacity(0.3 * _glowAnimation.value),
-                  blurRadius: 40,
-                  spreadRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 30,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(30)),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withOpacity(0.15),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const Center(
-                  child: Text(
-                    'Start Diagnosis',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildFeatureCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color iconColor,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.07),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
+      onTap: onStartDiagnosis,
+      child: Container(
+        height: 62,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          gradient: const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [Color(0xFF3B82F6), Color(0xFF0B5CFF), Color(0xFF1D4ED8)],
           ),
-          BoxShadow(
-            color: Colors.white.withOpacity(0.8),
-            blurRadius: 1,
-            spreadRadius: 0,
-            offset: const Offset(0, -1),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.white.withOpacity(0.9),
-          width: 1,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0B5CFF).withOpacity(.36),
+              blurRadius: 28,
+              offset: const Offset(0, 12),
+            ),
+            BoxShadow(
+              color: const Color(0xFF60A5FA).withOpacity(.30),
+              blurRadius: 44,
+              spreadRadius: 2,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textDark,
-                    letterSpacing: -0.1,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.blush,
-            size: 22,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          height: 88,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.72),
-            border: Border(
-              top: BorderSide(
-                color: AppColors.cardBorder.withOpacity(0.5),
-                width: 1,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.06),
-                blurRadius: 24,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                icon: Icons.home_rounded,
-                label: 'Home',
-                index: 0,
-                screenKey: 'home',
-              ),
-              _buildNavItem(
-                icon: Icons.history_rounded,
-                label: 'History',
-                index: 1,
-                screenKey: 'history',
-              ),
-              _buildNavItem(
-                icon: Icons.info_outline_rounded,
-                label: 'About',
-                index: 2,
-                screenKey: 'about',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-    required String screenKey,
-  }) {
-    final isSelected = _selectedIndex == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() => _selectedIndex = index);
-        widget.onNavigate?.call(screenKey);
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Stack(
           children: [
-            Icon(
-              icon,
-              size: 26,
-              color: isSelected ? AppColors.primary : const Color(0xFFB8A09A),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: Colors.white.withOpacity(.45)),
+                ),
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.primary : const Color(0xFFB8A09A),
+            Positioned(
+              top: 0,
+              left: 22,
+              right: 22,
+              child: Container(
+                height: 28,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.white.withOpacity(.23), Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+            const Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+                  SizedBox(width: 10),
+                  Text(
+                    'Start Scan',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .2,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -617,43 +274,168 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-class BokehPainter extends CustomPainter {
-  final List<_BokehDot> dots = const [
-    _BokehDot(0.08, 0.12, 18, 0.18),
-    _BokehDot(0.88, 0.06, 12, 0.13),
-    _BokehDot(0.15, 0.55, 10, 0.10),
-    _BokehDot(0.92, 0.35, 22, 0.15),
-    _BokehDot(0.5, 0.08, 8, 0.12),
-    _BokehDot(0.75, 0.75, 16, 0.10),
-    _BokehDot(0.3, 0.88, 20, 0.08),
-    _BokehDot(0.65, 0.5, 6, 0.09),
-    _BokehDot(0.02, 0.72, 14, 0.11),
-    _BokehDot(0.95, 0.88, 10, 0.08),
-  ];
+class FeatureCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool showDivider;
+
+  const FeatureCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.showDivider = true,
+  });
 
   @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(.34),
+                  border: Border.all(color: Colors.white.withOpacity(.54)),
+                ),
+                child: Icon(
+                  icon,
+                  color: const Color(0xFF0B5CFF),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: Color(0xFF0A2A66),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6B84A8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (showDivider)
+          Container(
+            height: 1,
+            color: const Color(0xFF0A2A66).withOpacity(.08),
+          ),
+      ],
+    );
+  }
+}
+
+class _PremiumHomeBackground extends StatelessWidget {
+  const _PremiumHomeBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFD5EBFF),
+            Color(0xFFEEF7FF),
+            Color(0xFFBFDFFF),
+            Color(0xFF88C4FF),
+          ],
+          stops: [0.0, 0.34, 0.72, 1.0],
+        ),
+      ),
+    );
+  }
+}
+
+class _SoftCircle extends StatelessWidget {
+  final double? top;
+  final double? left;
+  final double? right;
+  final double? bottom;
+  final double size;
+  final double opacity;
+
+  const _SoftCircle({
+    this.top,
+    this.left,
+    this.right,
+    this.bottom,
+    required this.size,
+    required this.opacity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: top,
+      left: left,
+      right: right,
+      bottom: bottom,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              Colors.white.withOpacity(opacity),
+              const Color(0xFF0B5CFF).withOpacity(opacity * .25),
+              Colors.transparent,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BokehPainter extends CustomPainter {
+  @override
   void paint(Canvas canvas, Size size) {
+    final dots = [
+      [0.08, 0.13, 15.0, .14],
+      [0.73, 0.18, 21.0, .14],
+      [0.92, 0.08, 12.0, .18],
+      [0.20, 0.55, 10.0, .12],
+      [0.82, 0.61, 20.0, .12],
+      [0.48, 0.86, 13.0, .12],
+    ];
+
     for (final dot in dots) {
-      final paint = Paint()
-        ..color = const Color(0xFFD9956E).withOpacity(dot.opacity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
       canvas.drawCircle(
-        Offset(size.width * dot.xFraction, size.height * dot.yFraction),
-        dot.radius,
-        paint,
+        Offset(size.width * dot[0], size.height * dot[1]),
+        dot[2],
+        Paint()
+          ..color = Colors.white.withOpacity(dot[3])
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
       );
     }
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _BokehDot {
-  final double xFraction;
-  final double yFraction;
-  final double radius;
-  final double opacity;
-
-  const _BokehDot(this.xFraction, this.yFraction, this.radius, this.opacity);
 }
